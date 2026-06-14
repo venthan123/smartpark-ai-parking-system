@@ -1,0 +1,22 @@
+# Java / Maven
+target/
+*.class
+*.jar
+
+# IntelliJ
+.idea/
+*.iml
+out/
+
+# Application secrets — NEVER push your DB password
+application.properties
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db

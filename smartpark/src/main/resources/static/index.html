@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPark Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        header { background: #1B3A6B; color: white; padding: 16px 24px;
+                 display: flex; align-items: center; justify-content: space-between; }
+        header h1 { font-size: 22px; font-weight: 600; }
+        header span { font-size: 13px; opacity: 0.8; }
+        .summary { display: flex; gap: 16px; padding: 20px 24px; flex-wrap: wrap; }
+        .stat-card { background: white; border-radius: 10px; padding: 16px 24px;
+                     flex: 1; min-width: 150px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        .stat-card .num { font-size: 32px; font-weight: 700; color: #1B3A6B; }
+        .stat-card .lbl { font-size: 13px; color: #666; margin-top: 4px; }
+        .alert-card .num { color: #d32f2f; }
+        .content { display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+                   padding: 0 24px 24px; }
+        @media(max-width:700px){ .content { grid-template-columns: 1fr; } }
+        .panel { background: white; border-radius: 10px; padding: 16px;
+                 box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        .panel h2 { font-size: 14px; font-weight: 600; color: #1B3A6B;
+                    margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 6px; color: #888;
+             border-bottom: 1px solid #eee; font-weight: 500; }
+        td { padding: 8px 6px; border-bottom: 1px solid #f5f5f5; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px;
+                 font-size: 11px; font-weight: 500; }
+        .badge-parked  { background: #e3f2fd; color: #1565c0; }
+        .badge-exited  { background: #e8f5e9; color: #2e7d32; }
+        .badge-alert   { background: #ffebee; color: #c62828; }
+        .badge-free    { background: #e8f5e9; color: #2e7d32; }
+        .badge-occupied{ background: #fff3e0; color: #e65100; }
+        .slots-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; }
+        .slot { border-radius: 8px; padding: 10px 6px; text-align: center;
+                font-size: 13px; font-weight: 600; }
+        .slot.free     { background: #e8f5e9; color: #2e7d32; }
+        .slot.occupied { background: #fff3e0; color: #e65100; }
+        .manual-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .manual-row input { flex: 1; min-width: 140px; padding: 8px 12px;
+                            border: 1px solid #ddd; border-radius: 8px;
+                            font-size: 14px; text-transform: uppercase; }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px;
+               cursor: pointer; font-size: 13px; font-weight: 500; }
+        .btn-entry  { background: #1B3A6B; color: white; }
+        .btn-exit   { background: #d32f2f; color: white; }
+        .btn-pdf    { background: #2e7d32; color: white; margin-top: 8px; }
+        .btn-refresh{ background: #f0f4f8; color: #1B3A6B; border: 1px solid #ddd; }
+        .bill-box { background: #f9f9f9; border: 1px dashed #ccc; border-radius: 8px;
+                    padding: 16px; font-size: 13px; display: none; }
+        .bill-box.show { display: block; }
+        .bill-row { display: flex; justify-content: space-between; padding: 4px 0;
+                    border-bottom: 1px dashed #eee; }
+        .bill-total-row { display: flex; justify-content: space-between;
+                          font-size: 16px; font-weight: 700; padding-top: 8px; color: #1B3A6B; }
+        #msg-box { position: fixed; top: 20px; right: 20px; padding: 12px 20px;
+                   border-radius: 8px; font-size: 14px; font-weight: 500;
+                   display: none; z-index: 9999; max-width: 320px; }
+        .msg-success { background: #2e7d32; color: white; }
+        .msg-error   { background: #c62828; color: white; }
+        .msg-warning { background: #e65100; color: white; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>SmartPark — AI Parking Dashboard</h1>
+    <span id="clock"></span>
+</header>
+
+<!-- Summary Cards -->
+<div class="summary">
+    <div class="stat-card">
+        <div class="num" id="s-parked">0</div>
+        <div class="lbl">Vehicles Parked</div>
+    </div>
+    <div class="stat-card">
+        <div class="num" id="s-free">0</div>
+        <div class="lbl">Free Slots</div>
+    </div>
+    <div class="stat-card alert-card">
+        <div class="num" id="s-alerts">0</div>
+        <div class="lbl">Alerts</div>
+    </div>
+</div>
+
+<div class="content">
+
+    <!-- Manual Entry/Exit + Bill -->
+    <div class="panel" style="grid-column: span 2">
+        <h2>Manual Entry / Exit</h2>
+        <div class="manual-row">
+            <input type="text" id="plate-input" placeholder="Enter plate e.g. TN09AB1234" maxlength="15">
+            <button class="btn btn-entry" onclick="manualEntry()">Entry</button>
+            <button class="btn btn-exit"  onclick="manualExit()">Exit & Show Bill</button>
+            <button class="btn btn-refresh" onclick="loadAll()">Refresh</button>
+        </div>
+        <!-- Bill display area (shown after exit) -->
+        <div class="bill-box" id="bill-box">
+            <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:12px">
+                SMARTPARK — PARKING BILL
+            </div>
+            <div class="bill-row"><span>Bill ID</span><span id="b-id">—</span></div>
+            <div class="bill-row"><span>Plate Number</span><span id="b-plate">—</span></div>
+            <div class="bill-row"><span>Entry Time</span><span id="b-entry">—</span></div>
+            <div class="bill-row"><span>Exit Time</span><span id="b-exit">—</span></div>
+            <div class="bill-row"><span>Duration</span><span id="b-dur">—</span></div>
+            <div class="bill-row"><span>Rate</span><span>Rs. 10.00 / hour</span></div>
+            <div class="bill-total-row"><span>TOTAL</span><span id="b-total">—</span></div>
+            <div style="text-align:right">
+                <button class="btn btn-pdf" id="pdf-btn" onclick="downloadPdf()">
+                    Download PDF Bill
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parking Slots Grid -->
+    <div class="panel">
+        <h2>Parking Slots</h2>
+        <div class="slots-grid" id="slots-grid">Loading...</div>
+    </div>
+
+    <!-- Active Vehicles -->
+    <div class="panel">
+        <h2>Currently Parked</h2>
+        <table>
+            <thead><tr><th>Plate</th><th>Entry Time</th><th>Status</th></tr></thead>
+            <tbody id="live-tbody"><tr><td colspan="3">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Recent Logs -->
+    <div class="panel" style="grid-column: span 2">
+        <h2>Recent Activity Log</h2>
+        <table>
+            <thead>
+            <tr><th>Plate</th><th>Entry</th><th>Exit</th><th>Duration</th><th>Fee</th><th>Status</th></tr>
+            </thead>
+            <tbody id="logs-tbody"><tr><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Alerts -->
+    <div class="panel" style="grid-column: span 2">
+        <h2>Unauthorized Vehicle Alerts</h2>
+        <table>
+            <thead><tr><th>Plate</th><th>Time</th><th>Message</th></tr></thead>
+            <tbody id="alerts-tbody"><tr><td colspan="3">No alerts</td></tr></tbody>
+        </table>
+    </div>
+
+</div>
+
+<div id="msg-box"></div>
+
+<script>
+    const BASE = 'http://localhost:8080/api';
+    let currentLogId = null;
+
+    function showMsg(msg, type='success') {
+      const box = document.getElementById('msg-box');
+      box.textContent = msg;
+      box.className = `msg-${type}`;
+      box.style.display = 'block';
+      setTimeout(() => box.style.display = 'none', 4000);
+    }
+
+    function fmtTime(s) {
+      if (!s) return '—';
+      return s.replace('T', ' ').substring(0, 19);
+    }
+
+    function fmtDur(mins) {
+      if (!mins) return '—';
+      const h = Math.floor(mins/60), m = mins%60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    async function loadSummary() {
+      const r = await fetch(`${BASE}/dashboard/summary`);
+      const d = await r.json();
+      document.getElementById('s-parked').textContent = d.parkedCount;
+      document.getElementById('s-free').textContent = d.freeSlots;
+      document.getElementById('s-alerts').textContent = d.alertCount;
+    }
+
+    async function loadSlots() {
+      const r = await fetch(`${BASE}/dashboard/slots`);
+      const slots = await r.json();
+      const grid = document.getElementById('slots-grid');
+      grid.innerHTML = slots.map(s =>
+        `<div class="slot ${s.occupied ? 'occupied' : 'free'}">
+          ${s.slotCode}<br>
+          <span style="font-size:10px;font-weight:400">
+            ${s.occupied ? (s.plateNumber || 'Taken') : 'Free'}
+          </span>
+        </div>`
+      ).join('');
+    }
+
+    async function loadLive() {
+      const r = await fetch(`${BASE}/dashboard/live`);
+      const logs = await r.json();
+      const tbody = document.getElementById('live-tbody');
+      if (!logs.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:#888">No vehicles currently parked</td></tr>';
+        return;
+      }
+      tbody.innerHTML = logs.map(l =>
+        `<tr>
+          <td><strong>${l.plateNumber}</strong></td>
+          <td>${fmtTime(l.entryTime)}</td>
+          <td><span class="badge badge-parked">PARKED</span></td>
+        </tr>`
+      ).join('');
+    }
+
+    async function loadLogs() {
+      const r = await fetch(`${BASE}/dashboard/logs`);
+      const logs = await r.json();
+      const tbody = document.getElementById('logs-tbody');
+      tbody.innerHTML = logs.map(l =>
+        `<tr>
+          <td><strong>${l.plateNumber}</strong></td>
+          <td>${fmtTime(l.entryTime)}</td>
+          <td>${fmtTime(l.exitTime)}</td>
+          <td>${fmtDur(l.durationMinutes)}</td>
+          <td>${l.feeAmount != null ? 'Rs. ' + l.feeAmount.toFixed(2) : '—'}</td>
+          <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
+        </tr>`
+      ).join('');
+    }
+
+    async function loadAlerts() {
+      const r = await fetch(`${BASE}/dashboard/alerts`);
+      const alerts = await r.json();
+      const tbody = document.getElementById('alerts-tbody');
+      if (!alerts.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:green">No alerts</td></tr>';
+        return;
+      }
+      tbody.innerHTML = alerts.map(a =>
+        `<tr>
+          <td><strong>${a.plateNumber}</strong></td>
+          <td>${fmtTime(a.alertTime)}</td>
+          <td><span class="badge badge-alert">${a.message}</span></td>
+        </tr>`
+      ).join('');
+    }
+
+    async function loadAll() {
+      await Promise.all([loadSummary(), loadSlots(), loadLive(), loadLogs(), loadAlerts()]);
+    }
+
+    async function manualEntry() {
+      const plate = document.getElementById('plate-input').value.trim().toUpperCase();
+      if (!plate) { showMsg('Please enter a plate number', 'error'); return; }
+      const r = await fetch(`${BASE}/vehicle/manual-entry`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({plate})
+      });
+      const d = await r.json();
+      if (d.status === 'ENTRY_SUCCESS') {
+        showMsg(`Entry recorded — ${plate} → Slot ${d.slot}`, 'success');
+      } else if (d.status === 'ENTRY_UNAUTHORIZED') {
+        showMsg(`ALERT: Unauthorized vehicle ${plate} — entry recorded`, 'warning');
+      } else {
+        showMsg(d.message || d.status, 'error');
+      }
+      document.getElementById('plate-input').value = '';
+      hideBill();
+      loadAll();
+    }
+
+    async function manualExit() {
+      const plate = document.getElementById('plate-input').value.trim().toUpperCase();
+      if (!plate) { showMsg('Please enter a plate number', 'error'); return; }
+      const r = await fetch(`${BASE}/vehicle/manual-exit`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({plate})
+      });
+      const d = await r.json();
+      if (d.status === 'EXIT_SUCCESS') {
+        showMsg(`Exit recorded — Rs. ${d.feeAmount}`, 'success');
+        showBill(d);
+      } else {
+        showMsg(d.message || d.status, 'error');
+      }
+      document.getElementById('plate-input').value = '';
+      loadAll();
+    }
+
+    function showBill(d) {
+      currentLogId = d.logId;
+      document.getElementById('b-id').textContent    = d.logId || '—';
+      document.getElementById('b-plate').textContent = d.plate;
+      document.getElementById('b-entry').textContent = fmtTime(d.entryTime);
+      document.getElementById('b-exit').textContent  = fmtTime(d.exitTime);
+      document.getElementById('b-dur').textContent   = fmtDur(d.durationMinutes);
+      document.getElementById('b-total').textContent = 'Rs. ' + parseFloat(d.feeAmount).toFixed(2);
+      document.getElementById('bill-box').classList.add('show');
+    }
+
+    function hideBill() {
+      document.getElementById('bill-box').classList.remove('show');
+      currentLogId = null;
+    }
+
+    function downloadPdf() {
+      if (!currentLogId) return;
+      window.open(`${BASE}/bill/pdf/${currentLogId}`, '_blank');
+    }
+
+    // Clock
+    setInterval(() => {
+      document.getElementById('clock').textContent =
+        new Date().toLocaleString('en-IN');
+    }, 1000);
+
+    // Auto-refresh every 10 seconds
+    setInterval(loadAll, 10000);
+
+    // Initial load
+    loadAll();
+</script>
+</body>
+</html>
+```
+
+---
